@@ -13,6 +13,9 @@ const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({ user }) => {
   const totalReports = mockBugReports.length;
   const acceptedReports = mockBugReports.filter(report => report.status === 'accepted').length;
 
+  // Calculate acceptance rate safely to avoid division by zero
+  const acceptanceRate = totalReports > 0 ? Math.round((acceptedReports / totalReports) * 100) : 0;
+
   return (
     <div className="space-y-6">
       <div>
@@ -37,7 +40,7 @@ const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({ user }) => {
         />
         <StatsCard
           title="Acceptance Rate"
-          value={`${Math.round((acceptedReports / totalReports) * 100)}%`}
+          value={`${acceptanceRate}%`}
           icon={Trophy}
           color="purple"
           trend={{ value: 5, label: "from last month" }}

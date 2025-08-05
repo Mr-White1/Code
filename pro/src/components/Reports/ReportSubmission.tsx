@@ -12,18 +12,83 @@ const ReportSubmission: React.FC = () => {
     attachments: [] as File[]
   });
 
+  // Add state for file upload errors
+  const [uploadErrors, setUploadErrors] = useState<string[]>([]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log('Submitting report:', formData);
     // Handle form submission
   };
 
+  const validateFile = (file: File): string | null => {
+    // File size validation (10MB limit)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      return `File "${file.name}" is too large. Maximum size is 10MB.`;
+    }
+
+    // MIME type validation - only allow specific safe file types
+    const allowedTypes = [
+      'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+      'video/mp4', 'video/webm', 'video/quicktime',
+      'text/plain', 'application/pdf',
+      'application/zip', 'application/x-zip-compressed'
+    ];
+    
+    if (!allowedTypes.includes(file.type)) {
+      return `File type "${file.type}" is not allowed for "${file.name}".`;
+    }
+
+    // File extension validation (double-check against MIME type spoofing)
+    const fileName = file.name.toLowerCase();
+    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.webm', '.mov', '.txt', '.pdf', '.zip'];
+    const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext));
+    
+    if (!hasValidExtension) {
+      return `File extension is not allowed for "${file.name}".`;
+    }
+
+    // Additional security check: prevent executable files
+    const dangerousExtensions = ['.exe', '.bat', '.cmd', '.scr', '.pif', '.com', '.js', '.jar', '.vbs', '.sh'];
+    const hasDangerousExtension = dangerousExtensions.some(ext => fileName.includes(ext));
+    
+    if (hasDangerousExtension) {
+      return `File "${file.name}" contains potentially dangerous content and cannot be uploaded.`;
+    }
+
+    return null; // File is valid
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setFormData({
-        ...formData,
-        attachments: [...formData.attachments, ...Array.from(e.target.files)]
+      const files = Array.from(e.target.files);
+      const errors: string[] = [];
+      const validFiles: File[] = [];
+
+      // Validate each file
+      files.forEach(file => {
+        const error = validateFile(file);
+        if (error) {
+          errors.push(error);
+        } else {
+          validFiles.push(file);
+        }
       });
+
+      // Update errors state
+      setUploadErrors(errors);
+
+      // Only add valid files
+      if (validFiles.length > 0) {
+        setFormData({
+          ...formData,
+          attachments: [...formData.attachments, ...validFiles]
+        });
+      }
+
+      // Clear the input value to allow re-uploading the same file if needed
+      e.target.value = '';
     }
   };
 
@@ -158,13 +223,14 @@ const ReportSubmission: React.FC = () => {
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors">
               <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
               <p className="text-sm text-gray-600 mb-2">Upload screenshots, videos, or proof-of-concept files</p>
+              <p className="text-xs text-gray-500 mb-2">Max file size: 10MB. Allowed types: Images, Videos, Text, PDF, ZIP</p>
               <input
                 type="file"
                 multiple
                 onChange={handleFileUpload}
                 className="hidden"
                 id="file-upload"
-                accept="image/*,video/*,.txt,.pdf,.zip"
+                accept="image/*,video/mp4,video/webm,video/quicktime,.txt,.pdf,.zip"
               />
               <label
                 htmlFor="file-upload"
@@ -173,11 +239,34 @@ const ReportSubmission: React.FC = () => {
                 Choose Files
               </label>
             </div>
+            
+            {/* Display upload errors */}
+            {uploadErrors.length > 0 && (
+              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex">
+                  <AlertTriangle className="w-5 h-5 text-red-400" />
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-red-800">Upload Errors</h3>
+                    <div className="mt-2 text-sm text-red-700">
+                      <ul className="list-disc pl-5 space-y-1">
+                        {uploadErrors.map((error, index) => (
+                          <li key={index}>{error}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {formData.attachments.length > 0 && (
               <div className="mt-3 space-y-2">
                 {formData.attachments.map((file, index) => (
                   <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                    <span className="text-sm text-gray-700">{file.name}</span>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-gray-700">{file.name}</span>
+                      <span className="text-xs text-gray-500">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                    </div>
                     <button
                       type="button"
                       onClick={() => {
